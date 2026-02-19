@@ -1,5 +1,5 @@
 {
-  "name": "alexwoollam/mu-loader",
+  "name": "zombie-flesh-eaters/mu-loader",
   "description": "Composer 2 plugin that generates a WordPress MU-plugin autoloader file from configured folders.",
   "type": "composer-plugin",
   "license": "MIT",
