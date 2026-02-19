@@ -12,7 +12,9 @@ composer require zombie-flesh-eaters/mu-loader
 
 On Composer autoload dump (`install`, `update`, or `dump-autoload`), this package:
 
-1. Scans configured MU-plugin folders for `.php` files (recursively).
+1. Scans configured MU-plugin folders and includes:
+   - top-level `.php` files in the MU root
+   - one entry file per plugin directory (`<slug>/<slug>.php`)
 2. Writes a generated loader file with `require_once` statements.
 
 Default output file:

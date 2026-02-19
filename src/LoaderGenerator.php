@@ -6,9 +6,7 @@ namespace MuLoader;
 
 use Composer\Composer;
 use Composer\IO\IOInterface;
-use RecursiveDirectoryIterator;
-use RecursiveIteratorIterator;
-use SplFileInfo;
+use FilesystemIterator;
 
 final class LoaderGenerator
 {
@@ -123,39 +121,107 @@ final class LoaderGenerator
     {
         $files = [];
         $excludeSet = \array_flip($exclude);
+        $mainFilesByInstallPath = $this->installedMainFilesByInstallPath($paths);
 
         foreach ($paths as $path) {
-            $iterator = new RecursiveIteratorIterator(
-                new RecursiveDirectoryIterator($path, RecursiveDirectoryIterator::SKIP_DOTS)
-            );
+            $iterator = new FilesystemIterator($path, FilesystemIterator::SKIP_DOTS);
 
-            /** @var SplFileInfo $item */
             foreach ($iterator as $item) {
-                if (!$item->isFile()) {
+                $itemPath = $this->normalizePath((string) $item->getPathname());
+
+                if ($item->isFile()) {
+                    if (\strtolower((string) $item->getExtension()) !== 'php') {
+                        continue;
+                    }
+
+                    if (\str_starts_with((string) $item->getFilename(), '.')) {
+                        continue;
+                    }
+
+                    if (isset($excludeSet[$itemPath])) {
+                        continue;
+                    }
+
+                    $files[] = $itemPath;
                     continue;
                 }
 
-                if (\strtolower($item->getExtension()) !== 'php') {
+                if (!$item->isDir()) {
                     continue;
                 }
 
-                $filename = $item->getFilename();
-                if (\str_starts_with($filename, '.')) {
+                $candidate = $mainFilesByInstallPath[$itemPath] ?? $this->normalizePath($itemPath . '/' . $item->getFilename() . '.php');
+                if (!\is_file($candidate) || isset($excludeSet[$candidate])) {
                     continue;
                 }
 
-                $real = $this->normalizePath((string) $item->getPathname());
-                if (isset($excludeSet[$real])) {
-                    continue;
-                }
-
-                $files[] = $real;
+                $files[] = $candidate;
             }
         }
 
         \sort($files);
 
         return \array_values(\array_unique($files));
+    }
+
+    /**
+     * @param array<int, string> $paths
+     * @return array<string, string>
+     */
+    private function installedMainFilesByInstallPath(array $paths): array
+    {
+        $result = [];
+        $localRepository = $this->composer->getRepositoryManager()->getLocalRepository();
+        $installationManager = $this->composer->getInstallationManager();
+
+        foreach ($localRepository->getPackages() as $package) {
+            try {
+                $installPath = $installationManager->getInstallPath($package);
+            } catch (\Throwable $exception) {
+                continue;
+            }
+
+            if (!\is_string($installPath) || $installPath === '') {
+                continue;
+            }
+
+            $installPath = $this->normalizePath($installPath);
+            if (!\is_dir($installPath) || !$this->isPathInConfiguredRoots($installPath, $paths)) {
+                continue;
+            }
+
+            $packageName = \method_exists($package, 'getPrettyName') ? $package->getPrettyName() : $package->getName();
+            $slug = $this->packageSlug($packageName);
+            $candidate = $this->normalizePath($installPath . '/' . $slug . '.php');
+            if (\is_file($candidate)) {
+                $result[$installPath] = $candidate;
+            }
+        }
+
+        return $result;
+    }
+
+    /**
+     * @param array<int, string> $roots
+     */
+    private function isPathInConfiguredRoots(string $path, array $roots): bool
+    {
+        $path = \rtrim($this->normalizePath($path), '/') . '/';
+        foreach ($roots as $root) {
+            $rootPrefix = \rtrim($this->normalizePath($root), '/') . '/';
+            if (\str_starts_with($path, $rootPrefix)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private function packageSlug(string $packageName): string
+    {
+        $parts = \explode('/', $packageName);
+
+        return $parts[\count($parts) - 1];
     }
 
     /**

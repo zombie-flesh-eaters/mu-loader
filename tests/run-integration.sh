@@ -7,7 +7,9 @@ TMP_DIR="$(mktemp -d)"
 trap 'rm -rf "${TMP_DIR}"' EXIT
 
 PROJECT_DIR="${TMP_DIR}/wp-project"
-mkdir -p "${PROJECT_DIR}/wp-content/mu-plugins" "${PROJECT_DIR}/web/app/mu-plugins"
+mkdir -p \
+  "${PROJECT_DIR}/wp-content/mu-plugins/security-headers/inc" \
+  "${PROJECT_DIR}/web/app/mu-plugins/sample-plugin/includes"
 
 cat > "${PROJECT_DIR}/composer.json" <<JSON
 {
@@ -50,15 +52,19 @@ cat > "${PROJECT_DIR}/composer.json" <<JSON
 }
 JSON
 
-cat > "${PROJECT_DIR}/wp-content/mu-plugins/zzz.php" <<'PHP'
+cat > "${PROJECT_DIR}/wp-content/mu-plugins/security-headers/security-headers.php" <<'PHP'
 <?php
 PHP
 
-cat > "${PROJECT_DIR}/wp-content/mu-plugins/skip-me.php" <<'PHP'
+cat > "${PROJECT_DIR}/wp-content/mu-plugins/security-headers/inc/internal.php" <<'PHP'
 <?php
 PHP
 
-cat > "${PROJECT_DIR}/web/app/mu-plugins/alpha.php" <<'PHP'
+cat > "${PROJECT_DIR}/web/app/mu-plugins/sample-plugin/sample-plugin.php" <<'PHP'
+<?php
+PHP
+
+cat > "${PROJECT_DIR}/web/app/mu-plugins/sample-plugin/includes/runtime.php" <<'PHP'
 <?php
 PHP
 
@@ -71,28 +77,29 @@ if [[ ! -f "${OUTPUT_FILE}" ]]; then
   exit 1
 fi
 
-if grep -Fq "skip-me.php" "${OUTPUT_FILE}"; then
-  echo "FAIL: excluded file was included in generated loader"
+if grep -Fq "internal.php" "${OUTPUT_FILE}" || grep -Fq "runtime.php" "${OUTPUT_FILE}"; then
+  echo "FAIL: non-entry files were included in generated loader"
   exit 1
 fi
 
-EXPECTED_FIRST="require_once __DIR__ . '/../../web/app/mu-plugins/alpha.php';"
-EXPECTED_SECOND="require_once __DIR__ . '/zzz.php';"
+EXPECTED_A="require_once __DIR__ . '/security-headers/security-headers.php';"
+EXPECTED_B="require_once __DIR__ . '/../../web/app/mu-plugins/sample-plugin/sample-plugin.php';"
 
-FIRST_REQUIRE="$(grep -E "^require_once " "${OUTPUT_FILE}" | sed -n '1p')"
-SECOND_REQUIRE="$(grep -E "^require_once " "${OUTPUT_FILE}" | sed -n '2p')"
-
-if [[ "${FIRST_REQUIRE}" != "${EXPECTED_FIRST}" ]]; then
-  echo "FAIL: first require mismatch"
-  echo "Expected: ${EXPECTED_FIRST}"
-  echo "Actual:   ${FIRST_REQUIRE}"
+REQUIRE_COUNT="$(grep -Ec "^require_once " "${OUTPUT_FILE}")"
+if [[ "${REQUIRE_COUNT}" != "2" ]]; then
+  echo "FAIL: expected exactly 2 require_once lines, got ${REQUIRE_COUNT}"
   exit 1
 fi
 
-if [[ "${SECOND_REQUIRE}" != "${EXPECTED_SECOND}" ]]; then
-  echo "FAIL: second require mismatch"
-  echo "Expected: ${EXPECTED_SECOND}"
-  echo "Actual:   ${SECOND_REQUIRE}"
+if ! grep -Fq "${EXPECTED_A}" "${OUTPUT_FILE}"; then
+  echo "FAIL: missing expected entry file require"
+  echo "Missing: ${EXPECTED_A}"
+  exit 1
+fi
+
+if ! grep -Fq "${EXPECTED_B}" "${OUTPUT_FILE}"; then
+  echo "FAIL: missing expected entry file require"
+  echo "Missing: ${EXPECTED_B}"
   exit 1
 fi
 
