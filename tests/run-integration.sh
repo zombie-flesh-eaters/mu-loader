@@ -13,22 +13,26 @@ cat > "${PROJECT_DIR}/composer.json" <<JSON
 {
   "name": "test/wp-project",
   "type": "project",
-  "repositories": [
-    {
-      "packagist.org": false
-    },
-    {
+  "repositories": {
+    "packagist.org": false,
+    "local": {
       "type": "path",
       "url": "${ROOT_DIR}",
-      "options": { "symlink": true }
+      "options": {
+        "symlink": true,
+        "versions": {
+          "zombie-flesh-eaters/mu-loader": "0.0.0"
+        }
+      }
     }
-  ],
+  },
   "require": {
-    "mu-loader/mu-loader": "*@dev"
+    "zombie-flesh-eaters/mu-loader": "0.0.0"
   },
   "config": {
+    "vendor-dir": "wp-content/vendor",
     "allow-plugins": {
-      "mu-loader/mu-loader": true
+      "zombie-flesh-eaters/mu-loader": true
     }
   },
   "extra": {

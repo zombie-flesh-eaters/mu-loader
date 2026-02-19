@@ -23,7 +23,7 @@ final class LoaderGenerator
 
     public function generate(): void
     {
-        $rootDir = $this->normalizePath(\dirname((string) $this->composer->getConfig()->get('vendor-dir')));
+        $rootDir = $this->projectRootDir();
         $extra = $this->composer->getPackage()->getExtra();
         $config = isset($extra['mu-loader']) && \is_array($extra['mu-loader']) ? $extra['mu-loader'] : [];
 
@@ -45,6 +45,16 @@ final class LoaderGenerator
         \file_put_contents($output, $contents);
 
         $this->io->write('<info>[mu-loader] Generated ' . $this->relativeToRoot($rootDir, $output) . ' (' . \count($files) . ' files)</info>');
+    }
+
+    private function projectRootDir(): string
+    {
+        $cwd = \getcwd();
+        if (\is_string($cwd) && $cwd !== '') {
+            return $this->normalizePath($cwd);
+        }
+
+        return $this->normalizePath((string) \dirname((string) $this->composer->getConfig()->get('vendor-dir')));
     }
 
     /**

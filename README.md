@@ -5,7 +5,7 @@ Composer 2 plugin for WordPress that generates a single MU-plugin loader file fr
 ## Install
 
 ```bash
-composer require mu-loader/mu-loader
+composer require zombie-flesh-eaters/mu-loader
 ```
 
 ## How it works
